@@ -32,7 +32,8 @@ BROWSERIFY_MODULES= \
 	src/recent.js \
 	src/sheet.js \
 	src/toMixedNumber.js \
-	src/humanized-precise.js
+	src/humanized-precise.js \
+	src/install-service-worker.js
 
 SERVER_RENDERING_TRGS= \
 	release/react/addons.js \
@@ -43,6 +44,7 @@ SERVER_RENDERING_TRGS= \
 	release/lib/views/lib/fractionParser.js \
 	release/lib/views/lib/schemeNumber.js \
 	release/lib/views/lib/biginteger.js \
+	release/_attachments/sw.js \
 	$(BROWSERIFY_MODULES:src/%=release/lib/%)
 
 CSS_FILES=vendor/bootstrap/_attachments/css/bootstrap.css _attachments/style/local.css
@@ -50,7 +52,7 @@ CSS_FILES=vendor/bootstrap/_attachments/css/bootstrap.css _attachments/style/loc
 FILES_FROM_COPY_DIRS=$(shell bash -c "find src/{$(COPY_DIRS)}")
 TRGS_FROM_COPY_DIRS=$(FILES_FROM_COPY_DIRS:src/%=%)
 SRCS=$(TRGS_FROM_COPY_DIRS) $(COPY_FILES)
-TRGS=$(SRCS:%=release/%) $(HTML_FILES:%=release/%) release/sums.json $(SERVER_RENDERING_TRGS)
+TRGS=$(SRCS:%=release/%) $(HTML_FILES:%=release/%) release/sums.json  $(SERVER_RENDERING_TRGS)
 
 UGLIFYJS=./node_modules/.bin/uglifyjs -nc --screw-ie8 --unsafe
 BROWSERIFY=./node_modules/.bin/browserify
@@ -117,6 +119,9 @@ remake: clean sharebill.json
 .intermediate/image-sums.json: $(IMAGE_SUM_FILES) ./collect_checksums.sh
 	./collect_checksums.sh $(IMAGE_SUM_FILES) > $@
 
+release/_attachments/sw.js: .intermediate/sw.js
+	mkdir -p `dirname $@`
+	cp $< $@
 
 release/sums.json: $(HTML_DEP_SUM_FILES) ./collect_checksums.sh
 	./collect_checksums.sh $(HTML_DEP_SUM_FILES) > $@
@@ -151,6 +156,9 @@ node_modules: package.json
 	npm install
 	touch node_modules
 
+.intermediate/sw.js:
+	$(UGLIFYJS) -o $@ ./src/sw.js
+
 .intermediate/all.js: $(BROWSERIFY_MODULES) node_modules
 	$(BROWSERIFY) \
 		-r './src/account-balance:./account-balance' \
@@ -161,6 +169,7 @@ node_modules: package.json
 		-r './src/post-editor:./post-editor' \
 		-r './src/recent:./recent' \
 		-r './src/changes:./changes' \
+		-r './src/install-service-worker:./install-service-worker' \
 		-r 'react' \
 		src/moment-config.js \
 		-o $@

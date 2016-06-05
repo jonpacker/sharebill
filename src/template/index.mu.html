@@ -52,6 +52,7 @@
 			var recent = require('./recent')(document.getElementById("recent"), "recent", {{{recent}}}, instanceConfig);
 			require('./entry-buttons')(document.getElementById("entry-buttons"), document.getElementById("entry"), instanceConfig);
 			var changes = new (require('./changes'))([balances, recent]);
+      require('./install-service-worker')("sw.js");
 		}());
 	</script>
 </body>
