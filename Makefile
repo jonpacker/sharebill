@@ -101,6 +101,10 @@ release/lib/%.js: src/%.js
 	mkdir -p `dirname $@`
 	$(UGLIFYJS) -o $@ $<
 
+release/_attachments/sw.js: .intermediate/sw.js
+	mkdir -p `dirname $@`
+	cp $< $@
+
 clean:
 	rm -rf sharebill.json release .intermediate
 
@@ -109,6 +113,8 @@ remake: clean sharebill.json
 .PHONY: clean remake
 
 
+.intermediate/sw.js: release/sums.json
+	echo "var sums = `cat $<`;" | cat - ./src/sw.js | $(UGLIFYJS) -o $@ -
 
 .intermediate/%.sum: src/% ./checksumify.sh
 	./checksumify.sh $<
@@ -118,10 +124,6 @@ remake: clean sharebill.json
 
 .intermediate/image-sums.json: $(IMAGE_SUM_FILES) ./collect_checksums.sh
 	./collect_checksums.sh $(IMAGE_SUM_FILES) > $@
-
-release/_attachments/sw.js: .intermediate/sw.js
-	mkdir -p `dirname $@`
-	cp $< $@
 
 release/sums.json: $(HTML_DEP_SUM_FILES) ./collect_checksums.sh
 	./collect_checksums.sh $(HTML_DEP_SUM_FILES) > $@
@@ -155,9 +157,6 @@ release/%.html: src/%.mu.html
 node_modules: package.json
 	npm install
 	touch node_modules
-
-.intermediate/sw.js:
-	$(UGLIFYJS) -o $@ ./src/sw.js
 
 .intermediate/all.js: $(BROWSERIFY_MODULES) node_modules
 	$(BROWSERIFY) \
