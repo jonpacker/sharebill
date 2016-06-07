@@ -113,8 +113,9 @@ remake: clean sharebill.json
 .PHONY: clean remake
 
 
-.intermediate/sw.js: release/sums.json
-	echo "var sums = `cat $<`;" | cat - ./src/sw.js | $(UGLIFYJS) -o $@ -
+.intermediate/sw.js: release/sums.json .intermediate/image-sums.json
+	find release/_attachments -name *\.sum* | sed -n 's|^release/_attachments/||p' | jq -RMsc 'split("\n")|map(select(.!=""))' - > .intermediate/sw.cachelist.json
+	echo "var toCache = `cat .intermediate/sw.cachelist.json`;" | cat - ./src/sw.js | $(UGLIFYJS) -o $@ -
 
 .intermediate/%.sum: src/% ./checksumify.sh
 	./checksumify.sh $<

@@ -1,12 +1,12 @@
-// a json object with all_js and all_cs checksums is pasted in here in the build
-// step. imagine it looks like this:
-// var sums = {
-//   "all_js": "123456789abcdef",
-//   "all_css": "fedcba987654321"
-// };
+// An array of checksummed files to cache, inserted by the build process. Just
+// imagine it was here and that it looked like this:
+// var toCache = ['blah.js', 'cats.gif', 'johanna.gif'];
 const version = 'v1';
 this.addEventListener('install', function(event) {
-    caches.open('v1').then(function(cache) {
-      
-    });
+  caches.open(version).then(function(cache) { 
+    return cache.addAll([
+      '',
+      'balances'
+    ].concat(toCache)) 
+  });
 });
