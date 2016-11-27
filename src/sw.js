@@ -23,7 +23,7 @@ function getDb() {
     };
     requestDbOpen.onupgradeneeded = function(event) {
       db = event.target.result;
-      db.createObjectStore("queued", { keyPath: "id" });
+      var store = db.createObjectStore("queued", { keyPath: "id" });
     };
   });
 }
@@ -31,9 +31,13 @@ function getDb() {
 function handleBalancesRequest(event) {
   event.respondWith(fetch(event.request).then(function(response) {
     var responseToCache = response.clone();
+
+    // cache successful balances response
     caches.open(version).then(function(cache) {
       cache.put(event.request, responseToCache);
     });
+
+    // send balances response from server to client
     return response.text().then(function(text) {
       var balances = JSON.parse(text);
       var responseSettings = {
@@ -41,7 +45,6 @@ function handleBalancesRequest(event) {
         statusText: response.statusText,
         headers: response.headers
       };
-      console.log(balances);
       return getDb().then(function(db) {
         transformBalances(balances);
         return new Response(JSON.stringify(balances), responseSettings);
@@ -52,9 +55,44 @@ function handleBalancesRequest(event) {
   }));
 }
 
+function handleNewPost(event) {
+  event.respondWith(fetch(event.request.clone()).catch(function() {
+    return event.request.json().then(function(entry) {
+      //add updates to indexeddb and respond with spoofed server response
+      return getDb().then(function(db) {
+        return new Promise(function (resolve, reject) {
+          var request = db.transaction("queued", "readwrite")
+            .objectStore("queued")
+            .put({
+              id: entry._id,
+              meta: entry.meta,
+              transaction: entry.transaction
+            });
+          request.onsuccess = resolve;
+          request.onerror = reject;
+        }).then(function() {
+          var fakeServerResponse = {
+            "ok": true,
+            "id": entry._id,
+            "rev": "-1-_"
+          };
+          var body = new Blob([JSON.stringify(fakeServerResponse)], {type:'application/json'});
+          return new Response(body, {
+            status: 201,
+            statusText: "Created"
+          });
+        });
+      })
+    })
+  }))
+}
+
 this.addEventListener('fetch', function(event) {
   if (event.request.url.match(/\/balances/)) {
     handleBalancesRequest(event);
+  } else if (event.request.url.match(/\/post\/[\d\w]{8}-[\d\w]{4}-[\d\w-]+/)
+             && event.request.method == 'PUT') {
+    handleNewPost(event);
   } else {
     event.respondWith(caches.match(event.request).catch(function() {
       return fetch(event.request);
