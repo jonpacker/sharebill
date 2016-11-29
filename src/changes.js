@@ -80,6 +80,9 @@ Changes.prototype.retry = function () {
 	this.backoffInterval = Math.max(this.backoffInterval * 2, 10000);
 };
 
+// a flag to tell the service worker to initiate a reload of recent transactions
+// on page load
+var firstPollOnPageLoad = true;
 Changes.prototype.poll = function () {
 	if (this.xhr) throw new Error("Changes.poll called when poll already in progress");
 
@@ -87,7 +90,14 @@ Changes.prototype.poll = function () {
 	this.xhr.onload = this.loadHandler.bind(this);
 	this.xhr.onerror = this.errorHandler.bind(this);
 	this.xhr.onabort = this.abortHandler.bind(this);
-	this.xhr.open("GET", "changes?feed=longpoll&since=" + encodeURIComponent(this.lastSeq));
+
+	var url = "changes?feed=longpoll&since=" + encodeURIComponent(this.lastSeq);
+	if (firstPollOnPageLoad) {
+		url += "&firstload=true";
+		firstPollOnPageLoad = false;
+	}
+
+	this.xhr.open("GET", url);
 	this.xhr.send();
 };
 

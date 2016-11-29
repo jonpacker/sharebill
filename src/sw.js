@@ -67,6 +67,25 @@ function handleBalancesRequest(event) {
   }));
 }
 
+function handleChangesRequest(event, forceLoadFromServer) {
+  if (event.request.url.match(/firstload=true/)) {
+    event.respondWith(getQueuedTransactions().then(function(transactions) {
+      if (!transactions.length) return fetch(requestWithCacheUpdate(event.request));
+      var since = event.request.url.match(/since=(\d+)/);
+      since = since ? parseInt(since[1]) : 0;
+      var changesObj = {
+        results: [
+          { seq: since, id: "", changes: [] }
+        ],
+        last_seq: since
+      };
+      return new Response(JSON.stringify(changesObj), { status: 200 });
+    }));
+  } else {
+    event.respondWith(fetch(requestWithCacheUpdate(event.request)));
+  }
+}
+
 function getQueuedTransactions() {
   return getDb().then(function(db) {
     return new Promise(function(resolve, reject) {
@@ -170,6 +189,8 @@ this.addEventListener('fetch', function(event) {
   } else if (event.request.url.match(/\/post\/[\d\w]{8}-[\d\w]{4}-[\d\w-]+/)
              && event.request.method == 'PUT') {
     handleNewPost(event);
+  } else if (event.request.url.match(/\/changes/)) {
+    handleChangesRequest(event);
   } else {
     event.respondWith(caches.match(event.request).catch(function() {
       return fetch(event.request);
