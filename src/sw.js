@@ -3,14 +3,50 @@
 // var toCache = ['blah.js', 'cats.gif', 'johanna.gif'];
 const version = 'v1';
 this.addEventListener('install', function(event) {
-  caches.open(version).then(function(cache) {
+  event.waitUntil(caches.open(version).then(function(cache) {
     return cache.addAll([
       '',
       'balances',
       'recent'
     ].concat(toCache))
-  });
+  }));
 });
+
+this.addEventListener('activate', function(event) {
+  console.log('activate event fired')
+  event.waitUntil(registration.sync.register('outbox').then(function() {
+    console.log("sync registration succeeded")
+  }).catch(function(e) {
+    console.log("sync registration failed:", e)
+  }));
+})
+
+this.addEventListener('sync', function(event) {
+  if (event.tag == 'outbox') {
+    event.waitUntil(getQueuedTransactions().then(function(transactions) {
+      return Promise.all(transactions.map(function(transaction) {
+        var preparedBody = { _id: transaction.id, meta: transaction.meta, transaction: transaction.transaction };
+        var request = new Request(transaction.id, {
+          method: 'PUT',
+          body: new Blob([JSON.stringify(preparedBody)], {type: 'application/json'})
+        });
+        return fetch(request).then(function(response) {
+          if (response.status != 201) throw "Expected status 200 from sync PUT";
+          console.log("synced transaction", transaction.id, "to server");
+          return getDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+              var txn = db.transaction("queued", "readwrite");
+              var del = txn.objectStore("queued").delete(transaction.id);
+              del.oncomplete = resolve;
+              del.onerror = reject;
+              txn.oncomplete = function() { db.close() }
+            })
+          })
+        })
+      }))
+    }));
+  }
+})
 
 function getDb() {
   return new Promise(function(resolve, reject) {
